@@ -3,8 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#00ff00">
 <title>Math Crossword</title>
 <style>
 body{font-family:Arial;background:#111;color:#fff;margin:0;padding:20px;text-align:center}
@@ -57,58 +55,68 @@ class MathCrossword {
         const op = ops[Math.floor(Math.random() * 3)];
         let n1, n2, res;
 
-        if (intersectPos === 0) n1 = intersectVal;
-        else if (intersectPos === 2) n2 = intersectVal;
-        else if (intersectPos === 4) res = intersectVal;
-
-        switch (op) {
-            case '+':
-                if (intersectPos === 4) {
-                    n1 = Math.floor(Math.random() * Math.min(res - 1, 99)) + 1;
-                    n2 = res - n1;
-                } else {
-                    n1 = n1 || Math.floor(Math.random() * 50) + 1;
-                    n2 = n2 || Math.floor(Math.random() * Math.min(100 - n1, 99)) + 1;
-                    res = n1 + n2;
+        // Wenn Ergebnis als Operand verwendet wird, generiere passende Gleichung
+        if (intersectPos === 0) {
+            n1 = intersectVal;
+            if (op === '+') {
+                n2 = Math.floor(Math.random() * 50) + 1;
+                res = n1 + n2;
+            } else if (op === '-') {
+                n2 = Math.floor(Math.random() * n1) + 1;
+                res = n1 - n2;
+            } else {
+                n2 = Math.floor(Math.random() * 10) + 2;
+                res = n1 * n2;
+            }
+        } else if (intersectPos === 2) {
+            n2 = intersectVal;
+            if (op === '+') {
+                n1 = Math.floor(Math.random() * 50) + 1;
+                res = n1 + n2;
+            } else if (op === '-') {
+                n1 = n2 + Math.floor(Math.random() * 50) + 1;
+                res = n1 - n2;
+            } else {
+                n1 = Math.floor(Math.random() * 10) + 2;
+                res = n1 * n2;
+            }
+        } else if (intersectPos === 4) {
+            // Ergebnis wird zu Operand - generiere rückwärts
+            res = intersectVal;
+            if (op === '+') {
+                n1 = Math.floor(Math.random() * Math.min(res - 1, 50)) + 1;
+                n2 = res - n1;
+            } else if (op === '-') {
+                n2 = Math.floor(Math.random() * Math.min(res, 50)) + 1;
+                n1 = res + n2;
+            } else {
+                // Multiplikation: finde Faktoren
+                const factors = [];
+                for (let i = 2; i <= Math.min(res, 12); i++) {
+                    if (res % i === 0 && res / i <= 50) factors.push(i);
                 }
-                break;
-            case '-':
-                if (intersectPos === 4) {
-                    n2 = Math.floor(Math.random() * Math.min(res - 1, 99)) + 1;
-                    n1 = res + n2;
-                } else if (intersectPos === 2) {
-                    n1 = n2 + Math.floor(Math.random() * Math.min(100 - n2, 99)) + 1;
-                    res = n1 - n2;
-                } else {
-                    res = Math.floor(Math.random() * 99) + 1;
-                    n2 = Math.floor(Math.random() * res) + 1;
-                    n1 = res + n2;
-                    if (n1 > 100) {
-                        n1 = Math.floor(Math.random() * 50) + 51;
-                        n2 = Math.floor(Math.random() * (n1 - 1)) + 1;
-                        res = n1 - n2;
-                    }
-                }
-                break;
-            case '*':
-                if (intersectPos === 4) {
-                    if (res > 50) return false;
-                    const factors = [];
-                    for (let i = 2; i <= Math.min(res, 10); i++) {
-                        if (res % i === 0 && res / i <= 50 && res / i >= 1) factors.push(i);
-                    }
-                    if (!factors.length) return false;
-                    n1 = factors[Math.floor(Math.random() * factors.length)];
-                    n2 = res / n1;
-                } else {
-                    n1 = n1 || Math.floor(Math.random() * 10) + 2;
-                    n2 = n2 || Math.floor(Math.random() * Math.min(Math.floor(100/n1), 50)) + 1;
-                    res = n1 * n2;
-                }
-                break;
+                if (!factors.length) return false;
+                n1 = factors[Math.floor(Math.random() * factors.length)];
+                n2 = res / n1;
+            }
+        } else {
+            // Neue Gleichung ohne Kreuzung
+            if (op === '+') {
+                n1 = Math.floor(Math.random() * 50) + 1;
+                n2 = Math.floor(Math.random() * 50) + 1;
+                res = n1 + n2;
+            } else if (op === '-') {
+                n1 = Math.floor(Math.random() * 50) + 25;
+                n2 = Math.floor(Math.random() * n1) + 1;
+                res = n1 - n2;
+            } else {
+                n1 = Math.floor(Math.random() * 10) + 2;
+                n2 = Math.floor(Math.random() * 8) + 2;
+                res = n1 * n2;
+            }
         }
 
-        if (n1 < 1 || n2 < 1 || res < 1 || n1 > 100 || n2 > 100 || res > 100) return false;
+        if (n1 < 1 || n2 < 1 || res < 1 || n1 > 99 || n2 > 99 || res > 99) return false;
 
         const vals = [n1, op, n2, '=', res];
         for (let i = 0; i < 5; i++) {
@@ -126,17 +134,16 @@ class MathCrossword {
     }
 
     tryIntersect() {
+        if (!this.equations.length) return;
         for (let a = 0; a < 40; a++) {
             const eq = this.equations[Math.floor(Math.random() * this.equations.length)];
             const newDir = eq.dir ? 0 : 1;
             
-            // Kreuze an Position 0, 2 oder 4 (alle Zahlen)
             const pos = [0, 2, 4][Math.floor(Math.random() * 3)];
             const intersectX = eq.dir ? eq.x + pos : eq.x;
             const intersectY = eq.dir ? eq.y : eq.y + pos;
             const intersectVal = eq.vals[pos];
             
-            // Neue Gleichung positionieren
             const startPos = Math.floor(Math.random() * 3);
             const newX = newDir ? intersectX - startPos * 2 : intersectX;
             const newY = newDir ? intersectY : intersectY - startPos * 2;
@@ -164,7 +171,7 @@ class MathCrossword {
         
         this.equations.forEach(eq => {
             let operandSlots = [];
-            for (let i = 0; i < 5; i += 2) { // Positionen 0, 2, 4 (Zahlen)
+            for (let i = 0; i < 5; i += 2) {
                 const px = eq.dir ? eq.x + i : eq.x;
                 const py = eq.dir ? eq.y : eq.y + i;
                 const key = `${px}-${py}`;
@@ -173,7 +180,6 @@ class MathCrossword {
                 }
             }
             
-            // Pro Gleichung: einen Operanden verstecken
             if (operandSlots.length > 0) {
                 const slot = operandSlots[Math.floor(Math.random() * operandSlots.length)];
                 this.availableNumbers.push(slot.value);
@@ -244,10 +250,7 @@ class MathCrossword {
         this.render();
 
         if (!this.availableNumbers.length) {
-            const allCorrect = [...this.expected.entries()].every(([key, val]) => {
-                const [x, y] = key.split('-').map(Number);
-                return this.grid[y][x] === val;
-            });
+            const allCorrect = this.checkSolution();
             
             document.getElementById('status').textContent = allCorrect 
                 ? '🎉 Perfekt! Neues Level in 2 Sekunden...' 
@@ -255,6 +258,55 @@ class MathCrossword {
                 
             if (allCorrect) setTimeout(() => this.newPuzzle(), 2000);
         }
+    }
+
+    checkSolution() {
+        return this.equations.every(eq => {
+            const [n1, op, n2, , res] = eq.vals.map((v, i) => {
+                if (typeof v === 'number') {
+                    const px = eq.dir ? eq.x + i : eq.x;
+                    const py = eq.dir ? eq.y : eq.y + i;
+                    return this.grid[py][px];
+                }
+                return v;
+            });
+            
+            // Prüfe ob Gleichung isoliert ist (keine Kreuzungen mit anderen)
+            const isIsolated = this.isEquationIsolated(eq);
+            
+            if (isIsolated && (op === '+' || op === '*')) {
+                // Bei kommutativen Operationen beide Reihenfolgen prüfen
+                return (op === '+' && n1 + n2 === res) || (op === '*' && n1 * n2 === res);
+            } else {
+                // Normale Validierung für nicht-isolierte oder nicht-kommutative Gleichungen
+                switch (op) {
+                    case '+': return n1 + n2 === res;
+                    case '-': return n1 - n2 === res;
+                    case '*': return n1 * n2 === res;
+                    default: return false;
+                }
+            }
+        });
+    }
+
+    isEquationIsolated(targetEq) {
+        for (let i = 0; i < 5; i += 2) { // Nur Zahlen-Positionen prüfen
+            const px = targetEq.dir ? targetEq.x + i : targetEq.x;
+            const py = targetEq.dir ? targetEq.y : targetEq.y + i;
+            
+            // Prüfe ob diese Position in anderen Gleichungen vorkommt
+            for (let otherEq of this.equations) {
+                if (otherEq === targetEq) continue;
+                
+                for (let j = 0; j < 5; j += 2) {
+                    const opx = otherEq.dir ? otherEq.x + j : otherEq.x;
+                    const opy = otherEq.dir ? otherEq.y : otherEq.y + j;
+                    
+                    if (px === opx && py === opy) return false; // Kreuzung gefunden
+                }
+            }
+        }
+        return true; // Keine Kreuzungen = isoliert
     }
 
     remove(x, y) {
