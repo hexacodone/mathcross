@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math Crossword</title>
+<style>
+body{font-family:Arial;background:#111;color:#fff;margin:0;padding:20px;text-align:center}
+.game-board{display:inline-grid;grid-template-columns:repeat(12,40px);grid-template-rows:repeat(12,40px);gap:1px;background:#333;padding:10px;margin:20px}
+.cell{width:40px;height:40px;background:#222;border:1px solid #444;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold}
+.cell.given{background:#5a5a2a;color:#ff0}
+.cell.operator{background:#5a2a2a;color:#f80}
+.cell.equals{background:#2a2a5a;color:#88f}
+.cell.empty-slot{background:#333;border:2px dashed #666;cursor:pointer}
+.cell.correct{background:#0a7a0a;color:#0f0;cursor:pointer}
+.cell.incorrect{background:#7a0a0a;color:#f88;cursor:pointer}
+.numbers{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;margin:20px}
+.number-tile{width:35px;height:35px;background:#3a6a3a;color:#0f0;border:1px solid #4a8a4a;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;cursor:grab;user-select:none}
+button{background:#333;color:#0f0;border:1px solid #0f0;padding:8px 16px;cursor:pointer;margin:10px}
+.status{margin:10px 0;font-size:16px}
+</style>
+</head>
+<body>
+<h1>Math Crossword</h1>
+<button onclick="game.newPuzzle()">Neues Rätsel</button>
+<div class="status" id="status">Ziehe Zahlen ins Grid</div>
+<div class="game-board" id="gameBoard"></div>
+<div class="numbers" id="numbersHand"></div>
+
+<script>
+class MathCrossword {
+    constructor() {
+        this.grid = Array(12).fill().map(() => Array(12).fill(null));
+        this.availableNumbers = [];
+        this.expected = new Map();
+        this.equations = [];
+    }
+
+    newPuzzle() {
+        this.grid = Array(12).fill().map(() => Array(12).fill(null));
+        this.expected.clear();
+        this.equations = [];
+        this.availableNumbers = [];
+        
+        this.addEquation(3, 5, 1);
+        for (let i = 0; i < 12; i++) this.tryIntersect();
+        
+        this.hideNumbers();
+        this.render();
+        document.getElementById('status').textContent = 'Ziehe Zahlen ins Grid - Klick zum Entfernen';
+    }
+
+    addEquation(x, y, dir, intersectVal = null, intersectPos = -1) {
+        const ops = ['+', '-', '*'];
+        const op = ops[Math.floor(Math.random() * 3)];
+        let n1, n2, res;
+
+        if (intersectPos === 0) n1 = intersectVal;
+        else if (intersectPos === 2) n2 = intersectVal;
+        else if (intersectPos === 4) res = intersectVal;
+
+        switch (op) {
+            case '+':
+                if (intersectPos === 4) {
+                    n1 = Math.floor(Math.random() * Math.min(res - 1, 99)) + 1;
+                    n2 = res - n1;
+                } else {
+                    n1 = n1 || Math.floor(Math.random() * 50) + 1;
+                    n2 = n2 || Math.floor(Math.random() * Math.min(100 - n1, 99)) + 1;
+                    res = n1 + n2;
+                }
+                break;
+            case '-':
+                if (intersectPos === 4) {
+                    n2 = Math.floor(Math.random() * Math.min(res - 1, 99)) + 1;
+                    n1 = res + n2;
+                } else if (intersectPos === 2) {
+                    n1 = n2 + Math.floor(Math.random() * Math.min(100 - n2, 99)) + 1;
+                    res = n1 - n2;
+                } else {
+                    res = Math.floor(Math.random() * 99) + 1;
+                    n2 = Math.floor(Math.random() * res) + 1;
+                    n1 = res + n2;
+                    if (n1 > 100) {
+                        n1 = Math.floor(Math.random() * 50) + 51;
+                        n2 = Math.floor(Math.random() * (n1 - 1)) + 1;
+                        res = n1 - n2;
+                    }
+                }
+                break;
+            case '*':
+                if (intersectPos === 4) {
+                    if (res > 50) return false;
+                    const factors = [];
+                    for (let i = 2; i <= Math.min(res, 10); i++) {
+                        if (res % i === 0 && res / i <= 50 && res / i >= 1) factors.push(i);
+                    }
+                    if (!factors.length) return false;
+                    n1 = factors[Math.floor(Math.random() * factors.length)];
+                    n2 = res / n1;
+                } else {
+                    n1 = n1 || Math.floor(Math.random() * 10) + 2;
+                    n2 = n2 || Math.floor(Math.random() * Math.min(Math.floor(100/n1), 50)) + 1;
+                    res = n1 * n2;
+                }
+                break;
+        }
+
+        if (n1 < 1 || n2 < 1 || res < 1 || n1 > 100 || n2 > 100 || res > 100) return false;
+
+        const vals = [n1, op, n2, '=', res];
+        for (let i = 0; i < 5; i++) {
+            const px = dir ? x + i : x;
+            const py = dir ? y : y + i;
+            if (px < 12 && py < 12) {
+                if (!this.grid[py][px]) this.grid[py][px] = vals[i];
+                if (typeof vals[i] === 'number' && !this.expected.has(`${px}-${py}`)) {
+                    this.expected.set(`${px}-${py}`, vals[i]);
+                }
+            }
+        }
+        this.equations.push({x, y, dir, vals});
+        return true;
+    }
+
+    tryIntersect() {
+        for (let a = 0; a < 40; a++) {
+            const eq = this.equations[Math.floor(Math.random() * this.equations.length)];
+            const newDir = eq.dir ? 0 : 1;
+            
+            // Kreuze an Position 0, 2 oder 4 (alle Zahlen)
+            const pos = [0, 2, 4][Math.floor(Math.random() * 3)];
+            const intersectX = eq.dir ? eq.x + pos : eq.x;
+            const intersectY = eq.dir ? eq.y : eq.y + pos;
+            const intersectVal = eq.vals[pos];
+            
+            // Neue Gleichung positionieren
+            const startPos = Math.floor(Math.random() * 3);
+            const newX = newDir ? intersectX - startPos * 2 : intersectX;
+            const newY = newDir ? intersectY : intersectY - startPos * 2;
+            
+            if (this.canPlace(newX, newY, newDir, intersectVal, startPos * 2)) {
+                if (this.addEquation(newX, newY, newDir, intersectVal, startPos * 2)) return;
+            }
+        }
+    }
+
+    canPlace(x, y, dir, val, pos) {
+        for (let i = 0; i < 5; i++) {
+            const px = dir ? x + i : x;
+            const py = dir ? y : y + i;
+            if (px < 0 || px >= 12 || py < 0 || py >= 12) return false;
+            const existing = this.grid[py][px];
+            if (existing && !(i === pos && existing === val)) return false;
+        }
+        return true;
+    }
+
+    hideNumbers() {
+        let processedSlots = new Set();
+        this.availableNumbers = [];
+        
+        this.equations.forEach(eq => {
+            let operandSlots = [];
+            for (let i = 0; i < 5; i += 2) { // Positionen 0, 2, 4 (Zahlen)
+                const px = eq.dir ? eq.x + i : eq.x;
+                const py = eq.dir ? eq.y : eq.y + i;
+                const key = `${px}-${py}`;
+                if (px < 12 && py < 12 && typeof this.grid[py][px] === 'number' && !processedSlots.has(key)) {
+                    if (i !== 4) operandSlots.push({ x: px, y: py, value: this.grid[py][px], key });
+                }
+            }
+            
+            // Pro Gleichung: einen Operanden verstecken
+            if (operandSlots.length > 0) {
+                const slot = operandSlots[Math.floor(Math.random() * operandSlots.length)];
+                this.availableNumbers.push(slot.value);
+                this.grid[slot.y][slot.x] = 'empty';
+                processedSlots.add(slot.key);
+            }
+        });
+
+        this.availableNumbers.sort((a, b) => a - b);
+    }
+
+    render() {
+        const board = document.getElementById('gameBoard');
+        board.innerHTML = '';
+        for (let y = 0; y < 12; y++) {
+            for (let x = 0; x < 12; x++) {
+                const div = document.createElement('div');
+                const cell = this.grid[y][x];
+                
+                if (!cell) {
+                    div.className = 'cell';
+                    div.style.visibility = 'hidden';
+                } else if (cell === 'empty') {
+                    div.className = 'cell empty-slot';
+                    div.ondragover = e => e.preventDefault();
+                    div.ondrop = e => {
+                        e.preventDefault();
+                        const num = +e.dataTransfer.getData('text');
+                        const idx = +e.dataTransfer.getData('index');
+                        this.place(x, y, num, idx);
+                    };
+                } else if (typeof cell === 'number') {
+                    const expected = this.expected.get(`${x}-${y}`);
+                    if (expected && expected !== cell) {
+                        div.className = `cell ${cell === expected ? 'correct' : 'incorrect'}`;
+                        div.textContent = cell;
+                        div.onclick = () => this.remove(x, y);
+                    } else {
+                        div.className = 'cell given';
+                        div.textContent = cell;
+                    }
+                } else {
+                    div.className = `cell ${cell === '=' ? 'equals' : 'operator'}`;
+                    div.textContent = cell;
+                }
+                board.appendChild(div);
+            }
+        }
+
+        const hand = document.getElementById('numbersHand');
+        hand.innerHTML = '';
+        this.availableNumbers.forEach((num, i) => {
+            const tile = document.createElement('div');
+            tile.className = 'number-tile';
+            tile.textContent = num;
+            tile.draggable = true;
+            tile.ondragstart = e => {
+                e.dataTransfer.setData('text', num);
+                e.dataTransfer.setData('index', i);
+            };
+            hand.appendChild(tile);
+        });
+    }
+
+    place(x, y, num, idx) {
+        this.grid[y][x] = num;
+        this.availableNumbers.splice(idx, 1);
+        this.render();
+
+        if (!this.availableNumbers.length) {
+            const allCorrect = [...this.expected.entries()].every(([key, val]) => {
+                const [x, y] = key.split('-').map(Number);
+                return this.grid[y][x] === val;
+            });
+            
+            document.getElementById('status').textContent = allCorrect 
+                ? '🎉 Perfekt! Neues Level in 2 Sekunden...' 
+                : '❌ Einige Zahlen sind falsch!';
+                
+            if (allCorrect) setTimeout(() => this.newPuzzle(), 2000);
+        }
+    }
+
+    remove(x, y) {
+        const cell = this.grid[y][x];
+        const expected = this.expected.get(`${x}-${y}`);
+        if (typeof cell === 'number' && expected && expected !== cell) {
+            this.availableNumbers.push(cell);
+            this.availableNumbers.sort((a, b) => a - b);
+            this.grid[y][x] = 'empty';
+            this.render();
+        }
+    }
+}
+
+const game = new MathCrossword();
+document.addEventListener('DOMContentLoaded', () => game.newPuzzle());
+</script>
+</body>
+</html>
